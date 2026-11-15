@@ -261,7 +261,9 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   `Date.now()` est en ms, les dates de fichiers en ns (prévoir une marge sur les âges).
 - **Nouveau fichier** : absent du scan précédent, inode non repris d'un fichier disparu (renommage),
   arrivé après la plus récente arrivée connue (moins 2 s, granularité FAT/SMB). Sans scan précédent
-  (redémarrage, chemin revenu, motifs changés) : arrivé après la plus récente arrivée enregistrée.
+  (redémarrage, chemin revenu) : arrivé après la plus récente arrivée enregistrée ; après un changement
+  de motifs, le premier scan n'annonce rien (l'horloge du conteneur et les dates d'un partage ne se
+  comparent pas).
 - **Seuils dans les filtres de scène** : les filtres ne font qu'égalité, donc `folder_stale` et
   `size_above` émettent un événement par seuil franchi, et la scène choisit son seuil dans un `select`
   obligatoire (`hours`, `threshold_mb`) ; les options du manifeste sont celles de `STALE_HOURS` et

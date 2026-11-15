@@ -129,7 +129,11 @@ export async function scanPath(
       result.lastAt = result.lastAt === null ? at : Math.max(result.lastAt, at);
       keepNewest(result.latest, { relative, at, size }, LATEST_COUNT);
     }
-    const isNew = previous ? !previous.has(relative) : since !== null && at > since;
+    // After a restart, a file dated ahead of the newest arrival remembered
+    // would be announced again at every restart.
+    const isNew = previous
+      ? !previous.has(relative)
+      : since !== null && at > since && at <= now + WATERMARK_TOLERANCE_MS;
     if (isNew) {
       result.addedCount += 1;
       keepNewest(result.added, { relative, at, size, ino }, MAX_ADDED);

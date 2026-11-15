@@ -150,7 +150,9 @@ export class WatchHub {
       // compares with the newest arrival remembered, as after a restart.
       for (const entry of this.entries.values()) {
         entry.snapshot = null;
-        entry.patternsChangedAt = this.now();
+        // The clock of the container and the times of a share do not compare:
+        // the first scan with the new patterns announces nothing.
+        entry.silent = true;
       }
     }
     this.signature = signature;
@@ -337,11 +339,8 @@ export class WatchHub {
       previous,
       // Known path without a previous scan: what arrived after the newest
       // file remembered (all its files if it was empty); unknown: nothing.
-      // Other patterns: only what arrived after the change.
       since:
-        previous || !previousState
-          ? null
-          : Math.max(previousState.watermark ?? -Infinity, entry.patternsChangedAt ?? -Infinity),
+        previous || !previousState || entry.silent ? null : (previousState.watermark ?? -Infinity),
       now,
       maxFiles,
       fs: this.fs,
@@ -465,7 +464,7 @@ export class WatchHub {
     entry.snapshot = result.inodes;
     const { inodes: _inodes, added: _added, ...scan } = result;
     entry.scan = scan;
-    entry.patternsChangedAt = null;
+    entry.silent = false;
     return { widget, saved: firstEver || JSON.stringify(state) !== original };
   }
 
