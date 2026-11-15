@@ -30,6 +30,13 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration touches: it lists the folders placed or mounted under
+`/data/watch` and reads the metadata of their files (name, size, dates,
+inode), never their content, and it skips symbolic links. It writes one file,
+`/data/file-watch-state.json` (per watched path: the newest arrival time and
+the thresholds already passed). It opens no network connection other than the
+one to Gladys, and stores no secret. A share mounted read-only is enough.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
 and the third-party services and devices the integration talks to.

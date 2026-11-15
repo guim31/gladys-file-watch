@@ -1,67 +1,187 @@
-# Template de démonstration
+# File watch
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Surveillez des dossiers et des fichiers depuis Gladys : les scans de
+l'imprimante, les photos d'un téléphone, les enregistrements d'une caméra, la
+sauvegarde de la nuit copiée sur le NAS. Chaque chemin surveillé devient un
+appareil avec son nombre de fichiers, sa taille totale, son dernier fichier et
+le temps écoulé depuis la dernière modification. Des scènes réagissent à un
+**nouveau fichier**, à un dossier **non modifié depuis un moment** (une
+sauvegarde qui n'arrive plus) et à une taille **au-dessus d'un seuil** ; un
+widget du tableau de bord liste les derniers fichiers.
 
-## Ce que vous obtenez
+Seuls les noms, tailles et dates sont lus, jamais le contenu des fichiers. Les
+dossiers sont analysés à intervalle régulier, ce qui fonctionne sur les
+partages réseau (NFS, SMB), où les notifications de changement ne voient rien
+de ce qu'écrit une autre machine.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+Testé pour de vrai dans un conteneur Docker verrouillé (le bac à sable de
+Gladys : système en lecture seule, aucune capacité, 256 Mo), avec créations,
+suppressions, renommages, une arborescence de 10 000 fichiers, un dossier
+supprimé puis recréé et des motifs d'exclusion ; pas encore dans un vrai
+Gladys : vos retours sont les bienvenus dans
+[les issues](https://github.com/guim31/gladys-file-watch/issues).
 
-## Configuration
+## Ce qu'il faut
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+- Gladys Assistant 5.1.0 ou plus récent.
+- Un accès à la machine qui fait tourner Gladys (un terminal, ou le partage de
+  fichiers d'un NAS), pour placer ou monter les dossiers à surveiller dans le
+  dossier de surveillance ci-dessous.
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+## Mise en route
 
-## Actions
+### 1. Où placer les dossiers
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+Gladys donne à chaque intégration **un seul dossier de sa machine**, et
+l'intégration ne peut en ouvrir aucun autre (elle tourne dans un bac à sable).
+Pour cette intégration, avec une installation standard de Gladys, c'est :
 
-## Scènes
+```
+/var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch
+```
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+Il est créé au premier démarrage ; dans l'intégration, il s'appelle
+`/data/watch`. Le bouton **Vérifier les dossiers surveillés** de la page de
+l'intégration donne le chemin exact de votre installation. Placez-y ce que vous
+voulez surveiller, d'une de ces façons :
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+- **Des fichiers écrits directement dedans** : faites pointer l'outil de
+  sauvegarde, le scanner ou la caméra vers ce dossier (ou un de ses
+  sous-dossiers), par exemple en le partageant avec Samba.
+- **Un partage réseau monté dedans** (NFS ou SMB d'un NAS), par exemple dans
+  `/etc/fstab` :
+  `//nas.local/backups /var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch/backups cifs ro,credentials=/root/.nas 0 0`
+- **Un dossier de la machine monté dedans** (montage bind, en lecture seule) :
+  `mount --bind -o ro /srv/photos /var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch/photos`
+
+Un lien symbolique vers un dossier extérieur ne fonctionne **pas** :
+l'intégration ne voit que son propre dossier. Après un montage, **redémarrez
+l'intégration** (Intégrations → File watch → Arrêter, puis Démarrer) : un
+montage fait pendant qu'elle tourne lui reste invisible.
+
+### 2. Configurer l'intégration
+
+- **Chemins à surveiller** : vide, chaque dossier et fichier à la racine du
+  dossier de surveillance est suivi, un nouveau apparaît tout seul. Ou une
+  liste séparée par des virgules, relative au dossier de surveillance :
+  `sauvegardes, nas/scans, logs/app.log` (un sous-dossier ou un seul fichier
+  peut être surveillé).
+- **Seulement ces fichiers** : motifs glob, par exemple `*.pdf, *.jpg`. Vide :
+  tous les fichiers.
+- **Ignorer** : motifs des fichiers et dossiers à laisser de côté. Par défaut :
+  fichiers cachés, fichiers temporaires des téléchargements et des copies
+  (`*.tmp`, `*.part`), fichiers système de Windows, macOS et Synology.
+- **Profondeur** : niveaux de sous-dossiers lus, 5 par défaut ; 1 pour les
+  seuls fichiers du dossier.
+- **Intervalle d'analyse** : de 30 secondes à 1 heure, 1 minute par défaut.
+- **Langue des noms** : langue des noms de fonctionnalités, des dates, des
+  tailles et des résultats de scène.
+
+Motifs : un motif sans `/` s'applique au nom, à toute profondeur (`*.mkv`,
+`@eaDir`) ; avec un `/`, au chemin dans le dossier surveillé
+(`daily/*.tar.gz`). `*` et `?` restent dans un dossier, `**` traverse les
+dossiers, `[abc]` et `[!abc]` sont des classes de caractères. La casse ne
+compte pas. Un dossier ignoré n'est pas parcouru.
+
+Cliquez ensuite sur **Vérifier les dossiers surveillés** : la réponse liste
+chaque chemin, son nombre de fichiers, et le chemin du dossier de surveillance
+sur la machine.
+
+### 3. Ajouter les appareils
+
+Dans l'onglet **Découverte**, ajoutez les chemins à suivre. Les déclencheurs de
+scène et le widget fonctionnent pour tous les chemins, ajoutés ou non.
+
+## Les appareils
+
+Un appareil par chemin surveillé, nommé d'après son chemin :
+
+| Fonctionnalité                        | Ce qu'elle indique                                               |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| Fichiers                              | nombre de fichiers comptés (après les motifs)                    |
+| Taille totale                         | leur taille totale, en Mo                                        |
+| Dernier fichier                       | le dernier fichier arrivé, avec son chemin dans le dossier       |
+| Date du dernier fichier               | sa date                                                          |
+| Temps depuis la dernière modification | minutes depuis l'arrivée du dernier fichier                      |
+| Accessible                            | Oui, ou Non si le chemin manque ou est illisible (partage coupé) |
+
+Un fichier « arrive » à la plus récente de ses dates de modification et de
+changement : une copie qui garde la date d'origine (`rsync -a`, `cp -p`) compte
+quand même comme nouvelle.
 
 ## Tableau de bord
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Le widget **Derniers fichiers** liste les huit derniers fichiers des dossiers
+choisis (tous par défaut), du plus récent au plus ancien, avec leur dossier,
+leur taille et leur date, sous deux tuiles : nombre de fichiers et taille
+totale. Une ligne nomme les dossiers inaccessibles. Ses réglages masquent les
+totaux et le bouton **Actualiser**, qui analyse les dossiers aussitôt.
+
+## Scènes
+
+### Déclencheurs
+
+- **Nouveau fichier** : un fichier apparaît dans un dossier surveillé. Un
+  fichier renommé ou déplacé dans le dossier n'est pas nouveau. Filtres :
+  dossiers, extension (`pdf`). Transmet le dossier, le fichier (chemin dans le
+  dossier), son extension, sa taille et le nombre de nouveaux fichiers :
+  au-delà de 5 nouveaux fichiers dans une analyse (un dossier copié d'un coup),
+  un seul événement porte le plus récent et le nombre.
+- **Dossier non modifié depuis un moment** : aucun fichier arrivé depuis la
+  durée choisie (de 1 heure à 7 jours). Se déclenche une fois par seuil, puis à
+  nouveau après un nouveau fichier. Transmet le dossier, le seuil, les heures
+  depuis le dernier fichier, son nom et sa date.
+- **Taille au-dessus d'un seuil** : la taille totale dépasse le seuil choisi
+  (de 100 Mo à 1 To). Se redéclenche après être repassée 5 % en dessous.
+  Transmet le dossier, le seuil, la taille et le nombre de fichiers.
+
+Un chemin vu pour la première fois ne déclenche rien : les seuils déjà passés
+sont pris en silence. Après un redémarrage de l'intégration, les fichiers
+arrivés entre-temps sont annoncés une fois.
+
+### Actions
+
+- **État d'un dossier** : lit un chemin surveillé pour les actions suivantes :
+  accessible ou non, fichiers, taille, dernier fichier et sa date, heures
+  écoulées depuis, et une phrase toute faite (« sauvegardes : 12 fichier(s),
+  45 Go, dernier : nightly.tar.gz (14/11/26 03:12) »).
+
+### Idées de scènes
+
+- **Nouveau fichier** dans `scans`, extension `pdf` → envoyer « Nouveau scan »
+  et le nom du fichier sur Telegram.
+- **Dossier non modifié depuis un moment**, `sauvegardes`, 48 heures →
+  prévenir que la sauvegarde de la nuit n'arrive plus.
+- **Taille au-dessus d'un seuil**, `camera`, 100 Go → un message pour faire du
+  ménage dans les enregistrements.
+- Chaque matin, **État d'un dossier** puis envoyer sa phrase.
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« Rien à surveiller »** : le dossier de surveillance est vide. Placez-y ou
+  montez-y un dossier, puis redémarrez l'intégration s'il s'agit d'un montage.
+- **Un chemin « inaccessible »** : le dossier manque (faute de frappe dans les
+  chemins, partage non monté) ou l'intégration ne peut pas le lire (elle tourne
+  sous l'utilisateur 1000 : donnez-lui la lecture, par exemple
+  `chmod -R o+rX` sur le dossier, ou l'option `uid=1000` d'un montage CIFS).
+- **Un partage monté apparaît vide** : le montage a été fait après le
+  démarrage de l'intégration : redémarrez-la.
+- **« more than 100000 files »** dans les logs : l'analyse d'un chemin s'arrête
+  à 100 000 fichiers pour tenir dans les 256 Mo du bac à sable. Surveillez un
+  sous-dossier, baissez la profondeur ou ajoutez des motifs.
+- **Logs détaillés** : `LOG_LEVEL=debug` (les analyses normales n'écrivent
+  rien).
+
+## Limites
+
+- Pas encore testée dans un vrai Gladys : vos retours sont les bienvenus.
+- Gladys ne laisse pas une intégration choisir un dossier de sa machine : les
+  dossiers doivent être placés ou montés dans le dossier de surveillance (voir
+  plus haut).
+- Analyse périodique, pas de notifications : un fichier créé puis supprimé
+  entre deux analyses n'est pas vu ; avec un intervalle d'une minute, un
+  nouveau fichier est annoncé en moins d'une minute.
+- Les liens symboliques à l'intérieur des dossiers surveillés sont ignorés.
+- 100 000 fichiers par chemin au plus, 50 chemins.
+- La syntaxe de motif `{a,b}` n'est pas prise en charge (la virgule sépare les
+  motifs).

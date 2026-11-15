@@ -1,177 +1,861 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "File watch",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Watch folders and files: new files, count, size, a backup that no longer arrives.",
+    "fr": "Surveillez dossiers et fichiers : nouveaux fichiers, nombre, taille, sauvegarde qui n'arrive plus.",
+    "de": "Überwache Ordner und Dateien: neue Dateien, Anzahl, Größe, ein ausbleibendes Backup.",
+    "es": "Vigile carpetas y archivos: archivos nuevos, número, tamaño, una copia que ya no llega."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-file-watch:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-file-watch/main/cover.png",
+  "categories": ["servers", "services"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Where to put the folders",
+        "fr": "Où placer les dossiers",
+        "de": "Wohin mit den Ordnern",
+        "es": "Dónde colocar las carpetas"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Gladys gives the integration a single folder of its host. Put, link or mount (NFS, SMB, bind mount) the folders to watch in its \"watch\" sub-folder, then restart the integration. The guide gives the exact path.",
+        "fr": "Gladys ne donne à l'intégration qu'un dossier de son hôte. Placez ou montez (NFS, SMB, montage bind) les dossiers à surveiller dans son sous-dossier « watch », puis redémarrez l'intégration. Le guide donne le chemin exact.",
+        "de": "Gladys gibt der Integration nur einen Ordner ihres Hosts. Lege oder hänge (NFS, SMB, Bind-Mount) die zu überwachenden Ordner in dessen Unterordner „watch“ ein und starte die Integration neu. Die Anleitung nennt den genauen Pfad.",
+        "es": "Gladys solo da a la integración una carpeta de su host. Coloque o monte (NFS, SMB, montaje bind) las carpetas que vigilar en su subcarpeta «watch» y reinicie la integración. La guía indica la ruta exacta."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-file-watch/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Einrichtungsanleitung",
+            "es": "Guía de instalación"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "paths",
+      "type": "string",
+      "label": {
+        "en": "Paths to watch",
+        "fr": "Chemins à surveiller",
+        "de": "Zu überwachende Pfade",
+        "es": "Rutas que vigilar"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
       "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+        "en": "Folders or files under /data/watch, separated by commas. Empty: every folder and file at the top of /data/watch.",
+        "fr": "Dossiers ou fichiers sous /data/watch, séparés par des virgules. Vide : chaque dossier et fichier à la racine de /data/watch.",
+        "de": "Ordner oder Dateien unter /data/watch, durch Kommas getrennt. Leer: jeder Ordner und jede Datei direkt in /data/watch.",
+        "es": "Carpetas o archivos bajo /data/watch, separados por comas. Vacío: cada carpeta y archivo en la raíz de /data/watch."
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "placeholder": {
+        "en": "e.g. backups, nas/scans",
+        "fr": "ex. sauvegardes, nas/scans",
+        "de": "z. B. backups, nas/scans",
+        "es": "p. ej. copias, nas/scans"
+      },
       "required": false,
-      "default": "celsius",
+      "default": ""
+    },
+    {
+      "key": "filters",
+      "type": "section",
+      "label": {
+        "en": "Filters",
+        "fr": "Filtres",
+        "de": "Filter",
+        "es": "Filtros"
+      }
+    },
+    {
+      "key": "include",
+      "type": "string",
+      "label": {
+        "en": "Only these files",
+        "fr": "Seulement ces fichiers",
+        "de": "Nur diese Dateien",
+        "es": "Solo estos archivos"
+      },
+      "description": {
+        "en": "Glob patterns, separated by commas: *.pdf, daily/*.tar.gz. Empty: every file.",
+        "fr": "Motifs glob, séparés par des virgules : *.pdf, daily/*.tar.gz. Vide : tous les fichiers.",
+        "de": "Glob-Muster, durch Kommas getrennt: *.pdf, daily/*.tar.gz. Leer: alle Dateien.",
+        "es": "Patrones glob, separados por comas: *.pdf, daily/*.tar.gz. Vacío: todos los archivos."
+      },
+      "placeholder": {
+        "en": "e.g. *.pdf, *.jpg",
+        "fr": "ex. *.pdf, *.jpg",
+        "de": "z. B. *.pdf, *.jpg",
+        "es": "p. ej. *.pdf, *.jpg"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "exclude",
+      "type": "string",
+      "label": {
+        "en": "Ignore",
+        "fr": "Ignorer",
+        "de": "Ignorieren",
+        "es": "Ignorar"
+      },
+      "description": {
+        "en": "Glob patterns of files and folders to ignore. The default skips hidden, temporary and system files.",
+        "fr": "Motifs glob des fichiers et dossiers à ignorer. Par défaut : fichiers cachés, temporaires et système.",
+        "de": "Glob-Muster der zu ignorierenden Dateien und Ordner. Standard: versteckte, temporäre und Systemdateien.",
+        "es": "Patrones glob de archivos y carpetas que ignorar. Por defecto: archivos ocultos, temporales y de sistema."
+      },
+      "required": false,
+      "default": ".*, *.tmp, *.part, *.partial, *.crdownload, ~$*, Thumbs.db, desktop.ini, @eaDir, #recycle"
+    },
+    {
+      "key": "max_depth",
+      "type": "number",
+      "label": {
+        "en": "Depth",
+        "fr": "Profondeur",
+        "de": "Tiefe",
+        "es": "Profundidad"
+      },
+      "description": {
+        "en": "Levels of sub-folders read: 1 for the files of the folder only.",
+        "fr": "Niveaux de sous-dossiers lus : 1 pour les seuls fichiers du dossier.",
+        "de": "Gelesene Unterordner-Ebenen: 1 nur für die Dateien des Ordners selbst.",
+        "es": "Niveles de subcarpetas leídos: 1 solo para los archivos de la carpeta."
+      },
+      "required": false,
+      "default": 5,
+      "min": 1,
+      "max": 20
+    },
+    {
+      "key": "options",
+      "type": "section",
+      "label": {
+        "en": "Options",
+        "fr": "Options",
+        "de": "Optionen",
+        "es": "Opciones"
+      }
+    },
+    {
+      "key": "poll_interval",
+      "type": "select",
+      "label": {
+        "en": "Scan interval",
+        "fr": "Intervalle d'analyse",
+        "de": "Scan-Intervall",
+        "es": "Intervalo de análisis"
+      },
+      "description": {
+        "en": "How often the folders are scanned (names, sizes and dates only, never the content).",
+        "fr": "Fréquence d'analyse des dossiers (noms, tailles et dates seulement, jamais le contenu).",
+        "de": "Wie oft die Ordner durchsucht werden (nur Namen, Größen und Daten, nie der Inhalt).",
+        "es": "Frecuencia de análisis de las carpetas (solo nombres, tamaños y fechas, nunca el contenido)."
+      },
+      "required": false,
+      "default": "60",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "300",
+          "label": {
+            "en": "5 minutes",
+            "fr": "5 minutes",
+            "de": "5 Minuten",
+            "es": "5 minutos"
+          }
+        },
+        {
+          "value": "900",
+          "label": {
+            "en": "15 minutes",
+            "fr": "15 minutes",
+            "de": "15 Minuten",
+            "es": "15 minutos"
+          }
+        },
+        {
+          "value": "3600",
+          "label": {
+            "en": "1 hour",
+            "fr": "1 heure",
+            "de": "1 Stunde",
+            "es": "1 hora"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the names",
+        "fr": "Langue des noms",
+        "de": "Sprache der Namen",
+        "es": "Idioma de los nombres"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Language of the feature names (set when a device is added), of the dates, sizes and scene results.",
+        "fr": "Langue des noms de fonctionnalités (fixés à l'ajout d'un appareil), des dates, tailles et résultats de scène.",
+        "de": "Sprache der Funktionsnamen (beim Hinzufügen eines Geräts festgelegt), der Daten, Größen und Szenenergebnisse.",
+        "es": "Idioma de los nombres de funciones (fijados al añadir un dispositivo), de las fechas, tamaños y resultados de escena."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "check_paths",
+      "label": {
+        "en": "Check the watched folders",
+        "fr": "Vérifier les dossiers surveillés",
+        "de": "Überwachte Ordner prüfen",
+        "es": "Comprobar las carpetas vigiladas"
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "new_file",
+      "label": {
+        "en": "New file",
+        "fr": "Nouveau fichier",
+        "de": "Neue Datei",
+        "es": "Archivo nuevo"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A file appears in a watched folder (a renamed file is not new). Beyond 5 at once, one event with the count.",
+        "fr": "Un fichier apparaît dans un dossier surveillé (un fichier renommé n'est pas nouveau). Au-delà de 5 d'un coup, un seul événement avec le nombre.",
+        "de": "Eine Datei erscheint in einem überwachten Ordner (eine umbenannte Datei ist nicht neu). Ab 6 auf einmal ein einziges Ereignis mit der Anzahl.",
+        "es": "Aparece un archivo en una carpeta vigilada (un archivo renombrado no es nuevo). Más de 5 a la vez: un solo evento con el número."
       },
       "fields": [
         {
           "key": "device",
-          "type": "select",
+          "type": "multi_select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "Folders (empty: any)",
+            "fr": "Dossiers (vide : tous)",
+            "de": "Ordner (leer: alle)",
+            "es": "Carpetas (vacío: todas)"
+          }
         },
         {
-          "key": "target",
+          "key": "extension",
+          "type": "string",
+          "label": {
+            "en": "Extension (empty: any)",
+            "fr": "Extension (vide : toutes)",
+            "de": "Endung (leer: alle)",
+            "es": "Extensión (vacío: todas)"
+          },
+          "placeholder": {
+            "en": "e.g. pdf",
+            "fr": "ex. pdf",
+            "de": "z. B. pdf",
+            "es": "p. ej. pdf"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "folder",
+          "type": "string",
+          "label": {
+            "en": "Folder",
+            "fr": "Dossier",
+            "de": "Ordner",
+            "es": "Carpeta"
+          }
+        },
+        {
+          "key": "file",
+          "type": "string",
+          "label": {
+            "en": "File (path in the folder)",
+            "fr": "Fichier (chemin dans le dossier)",
+            "de": "Datei (Pfad im Ordner)",
+            "es": "Archivo (ruta en la carpeta)"
+          }
+        },
+        {
+          "key": "extension",
+          "type": "string",
+          "label": {
+            "en": "Extension",
+            "fr": "Extension",
+            "de": "Endung",
+            "es": "Extensión"
+          }
+        },
+        {
+          "key": "size",
+          "type": "string",
+          "label": {
+            "en": "Size",
+            "fr": "Taille",
+            "de": "Größe",
+            "es": "Tamaño"
+          }
+        },
+        {
+          "key": "count",
+          "type": "number",
+          "label": {
+            "en": "Number of new files",
+            "fr": "Nombre de nouveaux fichiers",
+            "de": "Anzahl neuer Dateien",
+            "es": "Número de archivos nuevos"
+          }
+        }
+      ]
+    },
+    {
+      "key": "folder_stale",
+      "label": {
+        "en": "Folder not modified for a while",
+        "fr": "Dossier non modifié depuis un moment",
+        "de": "Ordner länger nicht geändert",
+        "es": "Carpeta sin cambios desde hace tiempo"
+      },
+      "description": {
+        "en": "No file arrived for the chosen time: a backup that no longer comes, a camera that stopped recording.",
+        "fr": "Aucun fichier arrivé depuis la durée choisie : une sauvegarde qui ne vient plus, une caméra qui n'enregistre plus.",
+        "de": "Seit der gewählten Zeit ist keine Datei angekommen: ein ausbleibendes Backup, eine Kamera, die nicht mehr aufnimmt.",
+        "es": "Ningún archivo ha llegado durante el tiempo elegido: una copia que ya no llega, una cámara que dejó de grabar."
+      },
+      "fields": [
+        {
+          "key": "device",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "source": "devices",
+          "label": {
+            "en": "Folders (empty: any)",
+            "fr": "Dossiers (vide : tous)",
+            "de": "Ordner (leer: alle)",
+            "es": "Carpetas (vacío: todas)"
+          }
+        },
+        {
+          "key": "hours",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Not modified for",
+            "fr": "Non modifié depuis",
+            "de": "Nicht geändert seit",
+            "es": "Sin cambios desde hace"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "1",
+              "label": {
+                "en": "1 hour",
+                "fr": "1 heure",
+                "de": "1 Stunde",
+                "es": "1 hora"
+              }
+            },
+            {
+              "value": "3",
+              "label": {
+                "en": "3 hours",
+                "fr": "3 heures",
+                "de": "3 Stunden",
+                "es": "3 horas"
+              }
+            },
+            {
+              "value": "6",
+              "label": {
+                "en": "6 hours",
+                "fr": "6 heures",
+                "de": "6 Stunden",
+                "es": "6 horas"
+              }
+            },
+            {
+              "value": "12",
+              "label": {
+                "en": "12 hours",
+                "fr": "12 heures",
+                "de": "12 Stunden",
+                "es": "12 horas"
+              }
+            },
+            {
+              "value": "24",
+              "label": {
+                "en": "24 hours",
+                "fr": "24 heures",
+                "de": "24 Stunden",
+                "es": "24 horas"
+              }
+            },
+            {
+              "value": "48",
+              "label": {
+                "en": "48 hours",
+                "fr": "48 heures",
+                "de": "48 Stunden",
+                "es": "48 horas"
+              }
+            },
+            {
+              "value": "72",
+              "label": {
+                "en": "3 days",
+                "fr": "3 jours",
+                "de": "3 Tage",
+                "es": "3 días"
+              }
+            },
+            {
+              "value": "168",
+              "label": {
+                "en": "7 days",
+                "fr": "7 jours",
+                "de": "7 Tage",
+                "es": "7 días"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "folder",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Folder",
+            "fr": "Dossier",
+            "de": "Ordner",
+            "es": "Carpeta"
+          }
+        },
+        {
+          "key": "hours",
+          "type": "number",
+          "label": {
+            "en": "Threshold (hours)",
+            "fr": "Seuil (heures)",
+            "de": "Schwelle (Stunden)",
+            "es": "Umbral (horas)"
+          }
+        },
+        {
+          "key": "age_hours",
+          "type": "number",
+          "label": {
+            "en": "Hours since the latest file",
+            "fr": "Heures depuis le dernier fichier",
+            "de": "Stunden seit der neuesten Datei",
+            "es": "Horas desde el último archivo"
+          }
+        },
+        {
+          "key": "last_file",
+          "type": "string",
+          "label": {
+            "en": "Latest file",
+            "fr": "Dernier fichier",
+            "de": "Neueste Datei",
+            "es": "Último archivo"
+          }
+        },
+        {
+          "key": "last_change",
+          "type": "string",
+          "label": {
+            "en": "Date of the latest file",
+            "fr": "Date du dernier fichier",
+            "de": "Datum der neuesten Datei",
+            "es": "Fecha del último archivo"
+          }
+        }
+      ]
+    },
+    {
+      "key": "size_above",
+      "label": {
+        "en": "Size above a threshold",
+        "fr": "Taille au-dessus d'un seuil",
+        "de": "Größe über einer Schwelle",
+        "es": "Tamaño por encima de un umbral"
+      },
+      "description": {
+        "en": "The total size of a watched path goes above the chosen threshold. Fires again once it went 5 % below.",
+        "fr": "La taille totale d'un chemin surveillé dépasse le seuil choisi. Se redéclenche après être repassée 5 % en dessous.",
+        "de": "Die Gesamtgröße eines überwachten Pfads überschreitet die gewählte Schwelle. Löst erneut aus, nachdem sie 5 % darunter lag.",
+        "es": "El tamaño total de una ruta vigilada supera el umbral elegido. Se vuelve a activar tras bajar un 5 % por debajo."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "multi_select",
+          "source": "devices",
+          "label": {
+            "en": "Folders (empty: any)",
+            "fr": "Dossiers (vide : tous)",
+            "de": "Ordner (leer: alle)",
+            "es": "Carpetas (vacío: todas)"
+          }
+        },
+        {
+          "key": "threshold_mb",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Threshold",
+            "fr": "Seuil",
+            "de": "Schwelle",
+            "es": "Umbral"
+          },
+          "options": [
+            {
+              "value": "100",
+              "label": {
+                "en": "100 MB",
+                "fr": "100 Mo",
+                "de": "100 MB",
+                "es": "100 MB"
+              }
+            },
+            {
+              "value": "1000",
+              "label": {
+                "en": "1 GB",
+                "fr": "1 Go",
+                "de": "1 GB",
+                "es": "1 GB"
+              }
+            },
+            {
+              "value": "10000",
+              "label": {
+                "en": "10 GB",
+                "fr": "10 Go",
+                "de": "10 GB",
+                "es": "10 GB"
+              }
+            },
+            {
+              "value": "50000",
+              "label": {
+                "en": "50 GB",
+                "fr": "50 Go",
+                "de": "50 GB",
+                "es": "50 GB"
+              }
+            },
+            {
+              "value": "100000",
+              "label": {
+                "en": "100 GB",
+                "fr": "100 Go",
+                "de": "100 GB",
+                "es": "100 GB"
+              }
+            },
+            {
+              "value": "500000",
+              "label": {
+                "en": "500 GB",
+                "fr": "500 Go",
+                "de": "500 GB",
+                "es": "500 GB"
+              }
+            },
+            {
+              "value": "1000000",
+              "label": {
+                "en": "1 TB",
+                "fr": "1 To",
+                "de": "1 TB",
+                "es": "1 TB"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "folder",
+          "type": "string",
+          "label": {
+            "en": "Folder",
+            "fr": "Dossier",
+            "de": "Ordner",
+            "es": "Carpeta"
+          }
+        },
+        {
+          "key": "threshold_mb",
+          "type": "number",
+          "label": {
+            "en": "Threshold (MB)",
+            "fr": "Seuil (Mo)",
+            "de": "Schwelle (MB)",
+            "es": "Umbral (MB)"
+          }
+        },
+        {
+          "key": "size",
+          "type": "string",
+          "label": {
+            "en": "Total size",
+            "fr": "Taille totale",
+            "de": "Gesamtgröße",
+            "es": "Tamaño total"
+          }
+        },
+        {
+          "key": "files",
+          "type": "number",
+          "label": {
+            "en": "Files",
+            "fr": "Fichiers",
+            "de": "Dateien",
+            "es": "Archivos"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_folder_status",
+      "label": {
+        "en": "State of a folder",
+        "fr": "État d'un dossier",
+        "de": "Zustand eines Ordners",
+        "es": "Estado de una carpeta"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Reads a watched path for the next actions: files, size, latest file, and a ready-made sentence.",
+        "fr": "Lit un chemin surveillé pour les actions suivantes : fichiers, taille, dernier fichier, et une phrase toute faite.",
+        "de": "Liest einen überwachten Pfad für die nächsten Aktionen: Dateien, Größe, neueste Datei und einen fertigen Satz.",
+        "es": "Lee una ruta vigilada para las acciones siguientes: archivos, tamaño, último archivo y una frase lista."
+      },
+      "timeout_seconds": 60,
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": true,
+          "label": {
+            "en": "Folder",
+            "fr": "Dossier",
+            "de": "Ordner",
+            "es": "Carpeta"
+          }
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
+          "key": "accessible",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Accessible",
+            "fr": "Accessible",
+            "de": "Erreichbar",
+            "es": "Accesible"
+          }
+        },
+        {
+          "key": "files",
+          "type": "number",
+          "label": {
+            "en": "Files",
+            "fr": "Fichiers",
+            "de": "Dateien",
+            "es": "Archivos"
+          }
+        },
+        {
+          "key": "size",
+          "type": "string",
+          "label": {
+            "en": "Total size",
+            "fr": "Taille totale",
+            "de": "Gesamtgröße",
+            "es": "Tamaño total"
+          }
+        },
+        {
+          "key": "last_file",
+          "type": "string",
+          "label": {
+            "en": "Latest file",
+            "fr": "Dernier fichier",
+            "de": "Neueste Datei",
+            "es": "Último archivo"
+          }
+        },
+        {
+          "key": "last_file_date",
+          "type": "string",
+          "label": {
+            "en": "Date of the latest file",
+            "fr": "Date du dernier fichier",
+            "de": "Datum der neuesten Datei",
+            "es": "Fecha del último archivo"
+          }
+        },
+        {
+          "key": "age_hours",
+          "type": "number",
+          "label": {
+            "en": "Hours since the latest file",
+            "fr": "Heures depuis le dernier fichier",
+            "de": "Stunden seit der neuesten Datei",
+            "es": "Horas desde el último archivo"
+          }
+        },
+        {
+          "key": "sentence",
+          "type": "string",
+          "label": {
+            "en": "Sentence",
+            "fr": "Phrase",
+            "de": "Satz",
+            "es": "Frase"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "latest_files",
+      "label": {
+        "en": "Latest files",
+        "fr": "Derniers fichiers",
+        "de": "Neueste Dateien",
+        "es": "Últimos archivos"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The latest files arrived in the watched folders, with their folder, size and date.",
+        "fr": "Les derniers fichiers arrivés dans les dossiers surveillés, avec dossier, taille et date.",
+        "de": "Die zuletzt angekommenen Dateien der überwachten Ordner, mit Ordner, Größe und Datum.",
+        "es": "Los últimos archivos llegados a las carpetas vigiladas, con carpeta, tamaño y fecha."
+      },
+      "icon": "folder",
+      "action_timeout_seconds": 60,
+      "settings": [
+        {
+          "key": "folders",
+          "type": "multi_select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Folders (empty: all)",
+            "fr": "Dossiers (vide : tous)",
+            "de": "Ordner (leer: alle)",
+            "es": "Carpetas (vacío: todas)"
+          },
+          "description": {
+            "en": "Empty: every watched path. Only the devices added to Gladys can be chosen.",
+            "fr": "Vide : tous les chemins surveillés. Seuls les appareils ajoutés à Gladys sont proposés.",
+            "de": "Leer: alle überwachten Pfade. Nur die zu Gladys hinzugefügten Geräte sind wählbar.",
+            "es": "Vacío: todas las rutas vigiladas. Solo se pueden elegir los dispositivos añadidos a Gladys."
+          }
+        },
+        {
+          "key": "show_totals",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "label": {
+            "en": "Show the totals",
+            "fr": "Afficher les totaux",
+            "de": "Summen anzeigen",
+            "es": "Mostrar los totales"
+          }
+        },
+        {
+          "key": "show_refresh",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "label": {
+            "en": "Show the Refresh button",
+            "fr": "Afficher le bouton Actualiser",
+            "de": "Schaltfläche Aktualisieren anzeigen",
+            "es": "Mostrar el botón Actualizar"
+          }
+        }
+      ]
     }
   ]
 }
