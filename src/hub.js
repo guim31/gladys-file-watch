@@ -29,7 +29,7 @@ import {
   pathValues,
 } from './devices.js';
 import { ProblemLog } from './problems.js';
-import { scanPath } from './scanner.js';
+import { MAX_FILES, scanPath } from './scanner.js';
 import {
   ACTION_TEXT,
   CONNECTION_TEXT,
@@ -62,6 +62,10 @@ const SIZE_REARM = 0.95;
 // Beyond this many new files in one scan of a path (a folder copied at once),
 // a single event carries the newest file and the count.
 export const MAX_EVENTS_PER_SCAN = 5;
+
+// Files across every path: the identities of the last scan stay in memory, and
+// the container has 256 MB.
+export const MAX_TOTAL_FILES = 200_000;
 
 export const HUB_TIMINGS = {
   // An unchanged value is sent again this often: Gladys shows "no recent
@@ -146,6 +150,7 @@ export class WatchHub {
       // compares with the newest arrival remembered, as after a restart.
       for (const entry of this.entries.values()) {
         entry.snapshot = null;
+        entry.patternsChangedAt = this.now();
       }
     }
     this.signature = signature;
@@ -292,18 +297,21 @@ export class WatchHub {
     }
 
     let dirty = false;
+    let budget = MAX_TOTAL_FILES;
     for (const entry of this.entries.values()) {
       if (this.stopped) {
         break;
       }
-      const changed = await this.scanEntry(entry);
+      const changed = await this.scanEntry(entry, Math.max(1, Math.min(MAX_FILES, budget)));
+      budget -= entry.accessible && entry.scan ? entry.scan.files : 0;
       widgetChanged = changed.widget || widgetChanged;
       dirty = changed.saved || dirty;
     }
-    // A path no longer watched is forgotten.
+    // A path no longer watched is forgotten (not while the root cannot be
+    // listed: its folders are then only out of sight).
     const keys = new Set([...this.entries.values()].map((entry) => entry.key));
     for (const key of Object.keys(this.saved.paths)) {
-      if (!keys.has(key)) {
+      if (!keys.has(key) && this.rootOk !== false) {
         delete this.saved.paths[key];
         dirty = true;
       }
@@ -317,7 +325,7 @@ export class WatchHub {
     return widgetChanged;
   }
 
-  async scanEntry(entry) {
+  async scanEntry(entry, maxFiles = MAX_FILES) {
     const now = this.now();
     const name = displayName(entry.path);
     const previousState = this.saved.paths[entry.key];
@@ -327,8 +335,15 @@ export class WatchHub {
       exclude: this.config.exclude,
       maxDepth: this.config.maxDepth,
       previous,
-      since: previous ? null : (previousState?.watermark ?? null),
+      // Known path without a previous scan: what arrived after the newest
+      // file remembered (all its files if it was empty); unknown: nothing.
+      // Other patterns: only what arrived after the change.
+      since:
+        previous || !previousState
+          ? null
+          : Math.max(previousState.watermark ?? -Infinity, entry.patternsChangedAt ?? -Infinity),
       now,
+      maxFiles,
       fs: this.fs,
     });
 
@@ -387,7 +402,7 @@ export class WatchHub {
       const present = result.inodes;
       const vanished = new Set();
       for (const [relative, ino] of previous) {
-        if (!present.has(relative) && ino !== '0') {
+        if (!present.has(relative)) {
           vanished.add(ino);
         }
       }
@@ -400,18 +415,25 @@ export class WatchHub {
     if (!firstEver && added.length > 0) {
       await this.fireNewFiles(entry, added, addedCount);
     }
-    if (result.lastAt !== null && (state.watermark === null || result.lastAt > state.watermark)) {
-      state.watermark = result.lastAt;
+    if (
+      result.arrivedAt !== null &&
+      (state.watermark === null || result.arrivedAt > state.watermark)
+    ) {
+      state.watermark = result.arrivedAt;
     }
 
     // Thresholds: a path seen for the first time takes the ones already
     // passed without announcing them.
     const language = this.config.language;
-    if (result.lastAt !== null) {
-      const hours = (now - result.lastAt) / 3600_000;
+    // The age runs from the newest arrival remembered: deleting the newest
+    // file (a rotation) does not make the folder older.
+    if (state.watermark !== null && result.lastAt !== null) {
+      const hours = Math.max(0, (now - state.watermark) / 3600_000);
       const kept = (state.stale ?? []).filter((h) => hours >= h);
       const due = STALE_HOURS.filter((h) => hours >= h && !kept.includes(h));
-      for (const h of firstEver ? [] : due) {
+      // Several thresholds at once (after an interruption): the highest only,
+      // not a burst of events and scenes.
+      for (const h of firstEver || due.length === 0 ? [] : [Math.max(...due)]) {
         logger.debug(`${name}: not modified for ${h} h`);
         await this.fire(TRIGGERS.STALE, {
           device: pathIds(this.gladys, entry.key).device,
@@ -419,7 +441,7 @@ export class WatchHub {
           hours: h,
           age_hours: Math.floor(hours),
           last_file: result.latest[0]?.relative ?? '',
-          last_change: formatTime(result.lastAt, language),
+          last_change: formatTime(state.watermark, language),
         });
       }
       state.stale = [...kept, ...due].sort((a, b) => a - b);
@@ -443,7 +465,8 @@ export class WatchHub {
     entry.snapshot = result.inodes;
     const { inodes: _inodes, added: _added, ...scan } = result;
     entry.scan = scan;
-    return { widget, saved: JSON.stringify(state) !== original };
+    entry.patternsChangedAt = null;
+    return { widget, saved: firstEver || JSON.stringify(state) !== original };
   }
 
   async fireNewFiles(entry, added, count) {

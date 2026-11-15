@@ -51,7 +51,12 @@ export function globToRegExp(glob) {
       source += escape(char);
     }
   }
-  return new RegExp(`^${source}$`, 'i');
+  try {
+    return new RegExp(`^${source}$`, 'i');
+  } catch {
+    // An invalid class such as [z-a]: the pattern is taken literally.
+    return new RegExp(`^${glob.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  }
 }
 
 /**

@@ -123,12 +123,12 @@ Schaltfläche **Aktualisieren** ausblenden, die die Ordner sofort durchsucht.
 
 - **Neue Datei**: Eine Datei erscheint in einem überwachten Ordner. Eine im
   Ordner umbenannte oder verschobene Datei ist nicht neu. Filter: Ordner,
-  Endung (`pdf`). Übergibt den Ordner, die Datei (Pfad im Ordner), ihre
+  Endung kleingeschrieben, ohne Punkt (`pdf`). Übergibt den Ordner, die Datei (Pfad im Ordner), ihre
   Endung, ihre Größe und die Anzahl neuer Dateien: Ab 6 neuen Dateien in einem
   Scan (ein auf einmal kopierter Ordner) trägt ein einziges Ereignis die
   neueste Datei und die Anzahl.
 - **Ordner länger nicht geändert**: Seit der gewählten Zeit (1 Stunde bis 7
-  Tage) ist keine Datei angekommen. Löst einmal pro Schwelle aus, nach einer
+  Tage) ist keine Datei angekommen. Löst einmal pro Schwelle aus (nur die höchste, wenn nach einer Unterbrechung mehrere zugleich überschritten sind), nach einer
   neuen Datei erneut. Übergibt den Ordner, die Schwelle, die Stunden seit der
   neuesten Datei, ihren Namen und ihr Datum.
 - **Größe über einer Schwelle**: Die Gesamtgröße überschreitet die gewählte
@@ -168,7 +168,7 @@ die zwischenzeitlich angekommenen Dateien einmal gemeldet.
 - **Eine eingehängte Freigabe erscheint leer**: Der Mount entstand nach dem
   Start der Integration: Starte sie neu.
 - **„more than 100000 files“** in den Protokollen: Der Scan eines Pfads stoppt
-  bei 100.000 Dateien, um in den 256 MB der Sandbox zu bleiben. Überwache einen
+  bei 100.000 Dateien (200.000 für alle Pfade zusammen), um in den 256 MB der Sandbox zu bleiben. Überwache einen
   Unterordner, verringere die Tiefe oder füge Muster hinzu.
 - **Ausführliche Protokolle**: `LOG_LEVEL=debug` (normale Scans schreiben
   nichts).
@@ -183,5 +183,5 @@ die zwischenzeitlich angekommenen Dateien einmal gemeldet.
   wieder gelöschte Datei wird nicht gesehen; bei 1 Minute Intervall wird eine
   neue Datei innerhalb einer Minute gemeldet.
 - Symbolische Links innerhalb der überwachten Ordner werden übersprungen.
-- Höchstens 100.000 Dateien pro Pfad, 50 Pfade.
+- Höchstens 100.000 Dateien pro Pfad und 200.000 insgesamt, 50 Pfade.
 - Die Mustersyntax `{a,b}` wird nicht unterstützt (das Komma trennt Muster).

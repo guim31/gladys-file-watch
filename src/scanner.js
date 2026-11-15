@@ -26,6 +26,10 @@ const STAT_CONCURRENCY = 16;
 // A file dated more than a day ahead of the clock (a camera with a wrong
 // date) must not hide the next real arrivals.
 const FUTURE_TOLERANCE_MS = 24 * 3600_000;
+// The newest arrival remembered (the floor of the new files) only takes the
+// files dated at most a few minutes ahead: one file dated hours ahead would
+// hide every real arrival until then.
+const WATERMARK_TOLERANCE_MS = 5 * 60_000;
 
 export const defaultFs = { lstat, readdir, stat };
 
@@ -67,7 +71,7 @@ const arrival = (stats) => Math.max(ms(stats, 'mtime'), ms(stats, 'ctime'));
  * @param {ReturnType<import('./glob.js').compilePatterns>} options.include
  * @param {ReturnType<import('./glob.js').compilePatterns>} options.exclude
  * @param {number} options.maxDepth
- * @param {Map<string,string>|null} options.previous inodes of the last scan, by relative path
+ * @param {Map<string,string>|null} options.previous identities of the last scan, by relative path
  * @param {number|null} options.since without `previous`: files arrived after it are new
  * @param {number} options.now
  * @param {number} [options.maxFiles]
@@ -100,6 +104,7 @@ export async function scanPath(
     files: 0,
     bytes: 0,
     lastAt: null,
+    arrivedAt: null,
     latest: [],
     added: [],
     addedCount: 0,
@@ -111,10 +116,15 @@ export async function scanPath(
   const visit = (relative, stats) => {
     const at = arrival(stats);
     const size = Number(stats.size);
-    const ino = String(stats.ino);
+    // A rename keeps the device, the inode, the size and the modification
+    // time; a new file that reuses a freed inode does not keep the last two.
+    const ino = `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeNs ?? stats.mtimeMs}`;
     result.files += 1;
     result.bytes += size;
     result.inodes.set(relative, ino);
+    if (at <= now + WATERMARK_TOLERANCE_MS) {
+      result.arrivedAt = result.arrivedAt === null ? at : Math.max(result.arrivedAt, at);
+    }
     if (at <= now + FUTURE_TOLERANCE_MS) {
       result.lastAt = result.lastAt === null ? at : Math.max(result.lastAt, at);
       keepNewest(result.latest, { relative, at, size }, LATEST_COUNT);

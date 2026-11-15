@@ -123,12 +123,12 @@ nombra las carpetas no accesibles. Sus ajustes ocultan los totales y el botón
 
 - **Archivo nuevo**: aparece un archivo en una carpeta vigilada. Un archivo
   renombrado o movido dentro de la carpeta no es nuevo. Filtros: carpetas,
-  extensión (`pdf`). Transmite la carpeta, el archivo (ruta en la carpeta), su
+  extensión en minúsculas, sin el punto (`pdf`). Transmite la carpeta, el archivo (ruta en la carpeta), su
   extensión, su tamaño y el número de archivos nuevos: más de 5 archivos nuevos
   en un análisis (una carpeta copiada de golpe) dan un solo evento con el más
   reciente y el número.
 - **Carpeta sin cambios desde hace tiempo**: ningún archivo ha llegado durante
-  el tiempo elegido (de 1 hora a 7 días). Se activa una vez por umbral, y de
+  el tiempo elegido (de 1 hora a 7 días). Se activa una vez por umbral (solo el más alto si se superan varios a la vez, tras una interrupción), y de
   nuevo tras un archivo nuevo. Transmite la carpeta, el umbral, las horas desde
   el último archivo, su nombre y su fecha.
 - **Tamaño por encima de un umbral**: el tamaño total supera el umbral elegido
@@ -167,7 +167,7 @@ mientras tanto se anuncian una vez.
 - **Una carpeta compartida montada aparece vacía**: el montaje se hizo después
   del arranque de la integración: reiníciela.
 - **«more than 100000 files»** en los registros: el análisis de una ruta se
-  detiene en 100 000 archivos para no superar los 256 MB del entorno aislado.
+  detiene en 100 000 archivos (200 000 para todas las rutas) para no superar los 256 MB del entorno aislado.
   Vigile una subcarpeta, reduzca la profundidad o añada patrones.
 - **Registros detallados**: `LOG_LEVEL=debug` (los análisis normales no
   escriben nada).
@@ -181,5 +181,5 @@ mientras tanto se anuncian una vez.
   dos análisis no se ve; con un intervalo de un minuto, un archivo nuevo se
   anuncia en menos de un minuto.
 - Los enlaces simbólicos dentro de las carpetas vigiladas se omiten.
-- 100 000 archivos por ruta como máximo, 50 rutas.
+- 100 000 archivos por ruta y 200 000 en total como máximo, 50 rutas.
 - La sintaxis de patrón `{a,b}` no se admite (la coma separa los patrones).

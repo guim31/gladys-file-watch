@@ -221,13 +221,14 @@ test('stale folder: each threshold fires once, and again after a new file', asyn
   const stale = eventsOf(world, TRIGGERS.STALE).filter((e) => e.folder === 'backups');
   assert.deepEqual(
     stale.map((event) => event.hours),
-    STALE_HOURS.filter((h) => h <= 25),
+    [Math.max(...STALE_HOURS.filter((h) => h <= 25))],
+    'several thresholds at once: the highest only',
   );
   assert.equal(stale[0].age_hours, 25);
   assert.equal(stale[0].last_file, 'monday.tar.gz');
   assert.equal(typeof stale[0].last_change, 'string');
   await world.hub.scanNow();
-  assert.equal(eventsOf(world, TRIGGERS.STALE).filter((e) => e.folder === 'backups').length, 5);
+  assert.equal(eventsOf(world, TRIGGERS.STALE).filter((e) => e.folder === 'backups').length, 1);
 
   // A new backup: the age falls back to 0, an hour later the 1 h threshold fires again.
   put(world.root, 'backups/tuesday.tar.gz', 'x', clock.now());
@@ -236,7 +237,7 @@ test('stale folder: each threshold fires once, and again after a new file', asyn
   await world.hub.scanNow();
   const again = eventsOf(world, TRIGGERS.STALE).filter((e) => e.folder === 'backups');
   assert.deepEqual(
-    again.slice(5).map((event) => event.hours),
+    again.slice(1).map((event) => event.hours),
     [1],
   );
 });
@@ -326,5 +327,70 @@ test('the container scans on its own timer, without onPoll', async (t) => {
   assert.deepEqual(
     eventsOf(world, TRIGGERS.NEW_FILE).map((event) => event.file),
     ['timer.pdf'],
+  );
+});
+
+test('a file reusing the inode of a deleted one is still new (rotation)', async (t) => {
+  const world = await createWorld({ root: folderRoot() });
+  t.after(() => world.app.stop());
+  for (let i = 0; i < 5; i += 1) {
+    remove(world.root, i === 0 ? 'backups/monday.tar.gz' : `backups/day-${i - 1}.tar.gz`);
+    put(world.root, `backups/day-${i}.tar.gz`, 'y'.repeat(10 + i));
+    await world.hub.scanNow();
+  }
+  assert.deepEqual(
+    eventsOf(world, TRIGGERS.NEW_FILE).map((event) => event.file),
+    ['day-0.tar.gz', 'day-1.tar.gz', 'day-2.tar.gz', 'day-3.tar.gz', 'day-4.tar.gz'],
+  );
+});
+
+test('a file dated hours ahead does not hide the next arrivals', async (t) => {
+  const world = await createWorld({ root: folderRoot() });
+  t.after(() => world.app.stop());
+  put(world.root, 'scans/camera.jpg', 'x', Date.now() + 10 * HOUR);
+  await world.hub.scanNow();
+  put(world.root, 'scans/next.jpg');
+  await world.hub.scanNow();
+  assert.deepEqual(
+    eventsOf(world, TRIGGERS.NEW_FILE).map((event) => event.file),
+    ['camera.jpg', 'next.jpg'],
+  );
+});
+
+test('deleting the newest file does not make the folder stale', async (t) => {
+  const root = tempDir();
+  put(root, 'logs/old.log', 'x', Date.now() - 30 * HOUR);
+  put(root, 'logs/recent.log', 'x');
+  const clock = createClock();
+  const world = await createWorld({ root, clock });
+  t.after(() => world.app.stop());
+  remove(root, 'logs/recent.log');
+  clock.advance(10 * 60_000);
+  await world.hub.scanNow();
+  assert.equal(eventsOf(world, TRIGGERS.STALE).length, 0);
+});
+
+test('a path empty at first sight announces the files arrived during a restart', async (t) => {
+  const root = tempDir();
+  mkdirSync(join(root, 'inbox'));
+  const dataDir = tempDir('gladys-file-watch-data-');
+  const first = await createWorld({ root, dataDir });
+  await first.app.stop();
+  put(root, 'inbox/letter.pdf');
+  const second = await createWorld({ root, dataDir });
+  t.after(() => second.app.stop());
+  assert.deepEqual(
+    eventsOf(second, TRIGGERS.NEW_FILE).map((event) => event.file),
+    ['letter.pdf'],
+  );
+});
+
+test('an invalid pattern is taken literally instead of failing the start', async (t) => {
+  const world = await createWorld({ root: folderRoot(), config: { exclude: '[z-a]*, *.log' } });
+  t.after(() => world.app.stop());
+  assert.deepEqual(world.fake.connectionStatus, { connected: true });
+  assert.deepEqual(
+    world.fake.discoveredDevices.map((device) => device.name),
+    ['backups', 'scans'],
   );
 });

@@ -323,6 +323,12 @@
             "fr": "ex. pdf",
             "de": "z. B. pdf",
             "es": "p. ej. pdf"
+          },
+          "description": {
+            "en": "Lowercase, without the dot: pdf, jpg.",
+            "fr": "En minuscules, sans le point : pdf, jpg.",
+            "de": "Kleingeschrieben, ohne Punkt: pdf, jpg.",
+            "es": "En minúsculas, sin el punto: pdf, jpg."
           }
         }
       ],

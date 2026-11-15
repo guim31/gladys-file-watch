@@ -63,7 +63,8 @@ its own timer and publishes only the values that changed.
 - Not yet tested in a real Gladys: feedback welcome.
 - No choice of a host folder (see above).
 - A file created then deleted between two scans is not seen.
-- 100,000 files per path (the sandbox has 256 MB), 50 paths.
+- 100,000 files per path and 200,000 in total (the sandbox has 256 MB), 50
+  paths.
 
 ## Development
 

@@ -123,12 +123,12 @@ totaux et le bouton **Actualiser**, qui analyse les dossiers aussitôt.
 
 - **Nouveau fichier** : un fichier apparaît dans un dossier surveillé. Un
   fichier renommé ou déplacé dans le dossier n'est pas nouveau. Filtres :
-  dossiers, extension (`pdf`). Transmet le dossier, le fichier (chemin dans le
+  dossiers, extension en minuscules, sans le point (`pdf`). Transmet le dossier, le fichier (chemin dans le
   dossier), son extension, sa taille et le nombre de nouveaux fichiers :
   au-delà de 5 nouveaux fichiers dans une analyse (un dossier copié d'un coup),
   un seul événement porte le plus récent et le nombre.
 - **Dossier non modifié depuis un moment** : aucun fichier arrivé depuis la
-  durée choisie (de 1 heure à 7 jours). Se déclenche une fois par seuil, puis à
+  durée choisie (de 1 heure à 7 jours). Se déclenche une fois par seuil (le plus haut seulement quand plusieurs sont passés d'un coup, après une interruption), puis à
   nouveau après un nouveau fichier. Transmet le dossier, le seuil, les heures
   depuis le dernier fichier, son nom et sa date.
 - **Taille au-dessus d'un seuil** : la taille totale dépasse le seuil choisi
@@ -167,7 +167,7 @@ arrivés entre-temps sont annoncés une fois.
 - **Un partage monté apparaît vide** : le montage a été fait après le
   démarrage de l'intégration : redémarrez-la.
 - **« more than 100000 files »** dans les logs : l'analyse d'un chemin s'arrête
-  à 100 000 fichiers pour tenir dans les 256 Mo du bac à sable. Surveillez un
+  à 100 000 fichiers (200 000 pour l'ensemble des chemins) pour tenir dans les 256 Mo du bac à sable. Surveillez un
   sous-dossier, baissez la profondeur ou ajoutez des motifs.
 - **Logs détaillés** : `LOG_LEVEL=debug` (les analyses normales n'écrivent
   rien).
@@ -182,6 +182,6 @@ arrivés entre-temps sont annoncés une fois.
   entre deux analyses n'est pas vu ; avec un intervalle d'une minute, un
   nouveau fichier est annoncé en moins d'une minute.
 - Les liens symboliques à l'intérieur des dossiers surveillés sont ignorés.
-- 100 000 fichiers par chemin au plus, 50 chemins.
+- 100 000 fichiers par chemin et 200 000 au total au plus, 50 chemins.
 - La syntaxe de motif `{a,b}` n'est pas prise en charge (la virgule sépare les
   motifs).

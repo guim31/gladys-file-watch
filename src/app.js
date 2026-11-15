@@ -56,6 +56,7 @@ export function registerHandlers(gladys, options = {}) {
       await hub.start(config);
     } catch (err) {
       logger.error('Initialization failed', err);
+      hub.connection = null; // the next status computed by the hub replaces this one
       await gladys.setConnectionStatus(false, INIT_FAILED).catch(() => {});
     } finally {
       resolveReady();

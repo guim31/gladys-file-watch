@@ -113,12 +113,12 @@ scans the folders at once.
 ### Triggers
 
 - **New file**: a file appears in a watched folder. A renamed or moved file
-  within the folder is not new. Filters: folders, extension (`pdf`). Passes on
+  within the folder is not new. Filters: folders, extension in lowercase, without the dot (`pdf`). Passes on
   the folder, the file (path in the folder), its extension, its size and the
   number of new files: beyond 5 new files in one scan (a folder copied at
   once), a single event carries the newest file and the count.
 - **Folder not modified for a while**: no file arrived for the chosen time (1
-  hour to 7 days). Fires once per threshold, then again after a new file.
+  hour to 7 days). Fires once per threshold (the highest one only when several are passed at once, after an interruption), then again after a new file.
   Passes on the folder, the threshold, the hours since the latest file, its
   name and date.
 - **Size above a threshold**: the total size goes above the chosen threshold
@@ -156,8 +156,7 @@ between are announced once.
   option of a CIFS mount).
 - **A mounted share shows an empty folder**: the mount was made after the
   start of the integration: restart it.
-- **"more than 100000 files"** in the logs: the scan of one path stops at
-  100,000 files to stay within the 256 MB of the sandbox. Watch a sub-folder,
+- **"more than 100000 files"** in the logs: the scan of one path stops at 100,000 files (200,000 for all the paths) to stay within the 256 MB of the sandbox. Watch a sub-folder,
   lower the depth or add patterns.
 - **Detailed logs**: set `LOG_LEVEL=debug` (normal scans write nothing).
 
@@ -170,5 +169,5 @@ between are announced once.
   is not seen; with a 1-minute interval, a new file is announced within a
   minute.
 - Symbolic links inside the watched folders are skipped.
-- 100,000 files per path at most, 50 paths.
+- 100,000 files per path and 200,000 in total at most, 50 paths.
 - The `{a,b}` pattern syntax is not supported (the comma separates patterns).
