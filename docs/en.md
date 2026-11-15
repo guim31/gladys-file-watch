@@ -1,61 +1,173 @@
-# Demo Devices Template
+# File watch
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Watch folders and files from Gladys: the scans of the printer, the photos of a
+phone, the recordings of a camera, the nightly backup copied to the NAS. Each
+watched path becomes a device with its number of files, total size, latest file
+and time since the last change. Scenes react to a **new file**, to a folder
+**not modified for a while** (a backup that no longer arrives) and to a size
+**above a threshold**; a dashboard widget lists the latest files.
 
-## What you get
+Only names, sizes and dates are read, never the content of the files. The
+folders are scanned at a regular interval, which works on network shares (NFS,
+SMB), where change notifications see nothing of what another machine writes.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+Tested for real in a locked-down Docker container (the sandbox of Gladys:
+read-only system, no capability, 256 MB), with creations, deletions, renames,
+a tree of 10,000 files, a folder deleted then created again and exclusion
+patterns; not yet in a real Gladys: feedback welcome on
+[the issues](https://github.com/guim31/gladys-file-watch/issues).
 
-## Configuration
+## What you need
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+- Gladys Assistant 5.1.0 or later.
+- Access to the machine that runs Gladys (a terminal, or the file sharing of a
+  NAS), to put or mount the folders to watch in the watch folder below.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Getting started
 
-## Actions
+### 1. Where to put the folders
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+Gladys gives each integration **a single folder of its machine**, and the
+integration cannot open any other one (it runs in a sandbox). For this
+integration, with a standard installation of Gladys, it is:
 
-## Scenes
+```
+/var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch
+```
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+It is created at the first start; inside the integration it is called
+`/data/watch`. The **Check the watched folders** button of the integration
+page gives the exact path of your installation. Put in it what you want to
+watch, in one of these ways:
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+- **Files written there directly**: point the backup tool, the scanner or the
+  camera at this folder (or at a sub-folder of it), for example by sharing it
+  with Samba.
+- **A network share mounted there** (NFS or SMB of a NAS), for example in
+  `/etc/fstab`:
+  `//nas.local/backups /var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch/backups cifs ro,credentials=/root/.nas 0 0`
+- **A folder of the machine mounted there** (a bind mount, read-only):
+  `mount --bind -o ro /srv/photos /var/lib/gladysassistant/external-integrations/ext-guim31-gladys-file-watch/watch/photos`
+
+A symbolic link to a folder outside does **not** work: the integration only
+sees its own folder. After mounting, **restart the integration** (Integrations
+→ File watch → Stop, then Start): a mount made while it runs stays invisible to
+it.
+
+### 2. Configure the integration
+
+- **Paths to watch**: empty, every folder and file at the top of the watch
+  folder is followed, a new one appears by itself. Or a list separated by
+  commas, relative to the watch folder: `backups, nas/scans, logs/app.log` (a
+  sub-folder or a single file can be watched).
+- **Only these files**: glob patterns, for example `*.pdf, *.jpg`. Empty: every
+  file.
+- **Ignore**: patterns of files and folders to leave aside. The default skips
+  hidden files, temporary files of downloads and copies (`*.tmp`, `*.part`),
+  and the system files of Windows, macOS and Synology.
+- **Depth**: levels of sub-folders read, 5 by default; 1 for the files of the
+  folder only.
+- **Scan interval**: 30 seconds to 1 hour, 1 minute by default.
+- **Language of the names**: language of the feature names, dates, sizes and
+  scene results.
+
+Patterns: a pattern without `/` applies to the name at any depth (`*.mkv`,
+`@eaDir`); with a `/`, to the path in the watched folder (`daily/*.tar.gz`).
+`*` and `?` stay within a folder, `**` crosses folders, `[abc]` and `[!abc]`
+are character classes. Case does not matter. An ignored folder is not entered.
+
+Then click **Check the watched folders**: the answer lists each path, its
+number of files, and the path of the watch folder on the machine.
+
+### 3. Add the devices
+
+In the **Discover** tab, add the paths to follow. The scene triggers and the
+widget work for every path, added or not.
+
+## The devices
+
+One device per watched path, named after its path:
+
+| Feature                | What it shows                                                  |
+| ---------------------- | -------------------------------------------------------------- |
+| Files                  | number of files counted (after the patterns)                   |
+| Total size             | their total size, in MB                                        |
+| Latest file            | the latest file arrived, with its path in the folder           |
+| Latest file date       | its date                                                       |
+| Time since last change | minutes since the latest file arrived                          |
+| Accessible             | Yes, or No when the path is missing or unreadable (share down) |
+
+A file "arrives" at the latest of its modification and change dates: a copy
+that keeps the original date (`rsync -a`, `cp -p`) still counts as new.
 
 ## Dashboard
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+The **Latest files** widget lists the eight latest files of the chosen folders
+(all by default), newest first, with their folder, size and date, under two
+tiles: number of files and total size. A line names the folders not
+accessible. Its settings hide the totals and the **Refresh** button, which
+scans the folders at once.
+
+## Scenes
+
+### Triggers
+
+- **New file**: a file appears in a watched folder. A renamed or moved file
+  within the folder is not new. Filters: folders, extension in lowercase, without the dot (`pdf`). Passes on
+  the folder, the file (path in the folder), its extension, its size and the
+  number of new files: beyond 5 new files in one scan (a folder copied at
+  once), a single event carries the newest file and the count.
+- **Folder not modified for a while**: no file arrived for the chosen time (1
+  hour to 7 days). Fires once per threshold (the highest one only when several are passed at once, after an interruption), then again after a new file.
+  Passes on the folder, the threshold, the hours since the latest file, its
+  name and date.
+- **Size above a threshold**: the total size goes above the chosen threshold
+  (100 MB to 1 TB). Fires again once the size went 5 % below. Passes on the
+  folder, the threshold, the size and the number of files.
+
+A path seen for the first time fires nothing: the thresholds already passed
+are taken silently. After a restart of the integration, the files arrived in
+between are announced once.
+
+### Actions
+
+- **State of a folder**: reads a watched path for the next actions: accessible
+  or not, files, size, latest file and its date, hours since then, and a
+  ready-made sentence ("backups: 12 file(s), 45 GB, latest: nightly.tar.gz
+  (14/11/26 03:12)").
+
+### Scene ideas
+
+- **New file** in `scans`, extension `pdf` → send "New scan" and the file
+  name on Telegram.
+- **Folder not modified for a while**, `backups`, 48 hours → warn that the
+  nightly backup no longer arrives.
+- **Size above a threshold**, `camera`, 100 GB → a message to clean the
+  recordings.
+- Every morning, **State of a folder** then send its sentence.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Nothing to watch yet"**: the watch folder is empty. Put or mount a folder
+  in it, then restart the integration if it is a mount.
+- **A path "not accessible"**: the folder is missing (typo in the paths, share
+  not mounted) or unreadable by the integration (it runs as user 1000: give it
+  read access, for example `chmod -R o+rX` on the folder, or the `uid=1000`
+  option of a CIFS mount).
+- **A mounted share shows an empty folder**: the mount was made after the
+  start of the integration: restart it.
+- **"more than 100000 files"** in the logs: the scan of one path stops at 100,000 files (200,000 for all the paths) to stay within the 256 MB of the sandbox. Watch a sub-folder,
+  lower the depth or add patterns.
+- **Detailed logs**: set `LOG_LEVEL=debug` (normal scans write nothing).
+
+## Limits
+
+- Not yet tested in a real Gladys: feedback welcome.
+- Gladys does not let an integration choose a folder of its machine: the
+  folders must be placed or mounted in the watch folder (see above).
+- Scanning, not notifications: a file created then deleted between two scans
+  is not seen; with a 1-minute interval, a new file is announced within a
+  minute.
+- Symbolic links inside the watched folders are skipped.
+- 100,000 files per path and 200,000 in total at most, 50 paths.
+- The `{a,b}` pattern syntax is not supported (the comma separates patterns).
